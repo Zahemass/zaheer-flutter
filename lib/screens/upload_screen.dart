@@ -1,15 +1,26 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:glassmorphism/glassmorphism.dart';
+import 'package:flutter_sound/flutter_sound.dart';
+import 'package:http/http.dart' as http;
 import 'package:iconsax/iconsax.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter_sound/flutter_sound.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
+
 import '../components/app_bar.dart';
 import '../components/category_chips.dart';
 import '../widgets/custom_bottom_nav.dart';
+import 'package:sample_proj/widgets/audio_controls.dart';
+import 'package:sample_proj/widgets/input_field.dart';
+import 'package:sample_proj/widgets/location_selector.dart';
+import 'package:sample_proj/widgets/upload_preview.dart';
+import 'package:sample_proj/widgets/upload_submit.dart';
+import 'package:sample_proj/widgets/thumbnail_selector.dart';
+
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -22,10 +33,14 @@ class _UploadScreenState extends State<UploadScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   int selectedCategoryIndex = 0;
-  int _selectedIndex = 0;
+  int _selectedIndex = 1;
 
   final List<String> categories = [
-    "Food", "Fun", "History", "Hidden spots", "Art & Culture"
+    "Food",
+    "Fun",
+    "History",
+    "Hidden spots",
+    "Art & Culture"
   ];
 
   final Map<String, String> categoryEmojis = {
@@ -41,6 +56,11 @@ class _UploadScreenState extends State<UploadScreen> {
   String? _recordedAudioPath;
   bool _isRecording = false;
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
+  Timer? _recordingTimer;
+  int _recordedSeconds = 0;
+  LatLng? _selectedLatLng;
+  bool _isGeneratingTitle = false;
+  bool _isUploadingSpot = false;
 
   @override
   void initState() {
@@ -58,6 +78,7 @@ class _UploadScreenState extends State<UploadScreen> {
     _titleController.dispose();
     _descriptionController.dispose();
     _recorder.closeRecorder();
+    _recordingTimer?.cancel();
     super.dispose();
   }
 
@@ -75,32 +96,48 @@ class _UploadScreenState extends State<UploadScreen> {
     );
 
     if (result != null && result.files.single.path != null) {
+      final file = File(result.files.single.path!);
+
       setState(() {
-        _uploadedAudio = File(result.files.single.path!);
+        _uploadedAudio = file;
+        _recordedAudioPath = null;
       });
+
+      await _generateTitleFromAudio(file);
     }
   }
 
   Future<void> _toggleRecording() async {
     if (_isRecording) {
       final path = await _recorder.stopRecorder();
+      _recordingTimer?.cancel();
       setState(() {
         _isRecording = false;
+        _recordedSeconds = 0;
         _recordedAudioPath = path;
-        _uploadedAudio = null; // override uploaded if recorded
+        _uploadedAudio = null;
       });
+
+      if (path != null) {
+        await _generateTitleFromAudio(File(path));
+      }
     } else {
       final dir = await getTemporaryDirectory();
       final path = '${dir.path}/recorded_audio.aac';
       await _recorder.startRecorder(toFile: path);
-      setState(() => _isRecording = true);
-    }
-  }
+      setState(() {
+        _isRecording = true;
+        _recordedSeconds = 0;
+      });
 
-  void _pickLocation() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("📍 Location picker placeholder")),
-    );
+      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+        if (_recordedSeconds >= 45) {
+          await _toggleRecording();
+          return;
+        }
+        setState(() => _recordedSeconds++);
+      });
+    }
   }
 
   void _showAudioOptions() {
@@ -109,7 +146,7 @@ class _UploadScreenState extends State<UploadScreen> {
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      ), // 👈 THIS was missing
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -133,6 +170,45 @@ class _UploadScreenState extends State<UploadScreen> {
       ),
     );
   }
+
+
+  Future<void> _generateTitleFromAudio(File audioFile) async {
+    setState(() => _isGeneratingTitle = true);
+
+    final uri = Uri.parse('http://192.168.29.17:4000/audiotitle');
+    final request = http.MultipartRequest('POST', uri)
+      ..files.add(await http.MultipartFile.fromPath('audio', audioFile.path));
+
+    try {
+      final response = await request.send();
+      if (response.statusCode == 200) {
+        final resBody = await response.stream.bytesToString();
+        final data = json.decode(resBody);
+        final generatedTitle = data['title'];
+        final generatedDescription = data['description'];
+
+        if (mounted) {
+          setState(() {
+            _titleController.text = generatedTitle;
+            _descriptionController.text = generatedDescription;
+          });
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("✅ Title and description generated.")),
+        );
+      } else {
+        throw Exception("Failed to fetch title and description");
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to generate from audio.")),
+      );
+    } finally {
+      setState(() => _isGeneratingTitle = false);
+    }
+  }
+
 
   void _showThumbnailOptions() {
     showModalBottomSheet(
@@ -165,6 +241,95 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
+  Future<void> _uploadSpot() async {
+    if (_titleController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a title")),
+      );
+      return;
+    }
+
+    if (_uploadedAudio == null && _recordedAudioPath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please upload or record an audio file")),
+      );
+      return;
+    }
+
+    if (_thumbnail == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please add a thumbnail image")),
+      );
+      return;
+    }
+
+    if (_selectedLatLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please pick a location")),
+      );
+      return;
+    }
+
+    setState(() => _isUploadingSpot = true);
+
+    try {
+      final uri = Uri.parse('http://192.168.29.17:4000/spots');
+      final request = http.MultipartRequest('POST', uri);
+
+      final selectedCategory = categories[selectedCategoryIndex];
+
+      request.fields['spotname'] = _titleController.text.trim();
+      request.fields['description'] = _descriptionController.text.trim();
+      request.fields['category'] = selectedCategory;
+      request.fields['latitude'] = _selectedLatLng!.latitude.toString();
+      request.fields['longitude'] = _selectedLatLng!.longitude.toString();
+
+      request.files.add(await http.MultipartFile.fromPath(
+        'audio',
+        _uploadedAudio?.path ?? _recordedAudioPath!,
+      ));
+
+      request.files.add(await http.MultipartFile.fromPath(
+        'image',
+        _thumbnail!.path,
+      ));
+
+      final response = await request.send();
+
+      if (response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("✅ Spot uploaded successfully")),
+        );
+
+        // ✅ Reset all fields
+        setState(() {
+          _titleController.clear();
+          _descriptionController.clear();
+          _uploadedAudio = null;
+          _recordedAudioPath = null;
+          _thumbnail = null;
+          _selectedLatLng = null;
+          _recordedSeconds = 0;
+          selectedCategoryIndex = 0; // Optional: reset to first category
+        });
+      } else {
+        final errBody = await response.stream.bytesToString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("❌ Upload failed. Please try again.")),
+        );
+        debugPrint("Upload failed: $errBody");
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error uploading spot: $e")),
+      );
+      debugPrint("Exception during upload: $e");
+    } finally {
+      setState(() => _isUploadingSpot = false);
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final selectedCategory = categories[selectedCategoryIndex];
@@ -188,160 +353,83 @@ class _UploadScreenState extends State<UploadScreen> {
                   CategoryChips(
                     categories: categories,
                     selectedIndex: selectedCategoryIndex,
-                    onSelected: (index) {
-                      setState(() => selectedCategoryIndex = index);
-                    },
+                    onSelected: (index) => setState(() => selectedCategoryIndex = index),
                   ),
                   const SizedBox(height: 24),
 
-                  Row(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3))],
+                  LocationSelector(
+                    selectedLatLng: _selectedLatLng,
+                    onPickLocation: (latLng) => setState(() => _selectedLatLng = latLng),
+                  ),
+                  const SizedBox(height: 24),
+
+                  AudioControls(
+                    isRecording: _isRecording,
+                    recordedSeconds: _recordedSeconds,
+                    onAudioOptions: _showAudioOptions,
+                    onStopRecording: _toggleRecording,
+                    onAddThumbnail: _showThumbnailOptions, // ✅ Pass function here
+                  ),
+
+                  const SizedBox(height: 24),
+
+
+                  UploadPreview(
+                    uploadedAudio: _uploadedAudio,
+                    recordedAudioPath: _recordedAudioPath,
+                  ),
+
+                  if (_isGeneratingTitle) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: const [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.pink),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                        child: Text(emoji, style: const TextStyle(fontSize: 24)),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Iconsax.add_circle),
-                          label: const Text("Add Location"),
-                          onPressed: _pickLocation,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.black87,
-                            side: const BorderSide(color: Colors.black26),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  Row(
-                    children: [
-                      _roundedButton(
-                        icon: Iconsax.microphone,
-                        text: "Audio Options",
-                        onTap: _showAudioOptions,
-                      ),
-                      const SizedBox(width: 12),
-                      _roundedButton(
-                        icon: Iconsax.gallery,
-                        text: "Thumbnail Options",
-                        onTap: _showThumbnailOptions,
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  if (_thumbnail != null) ...[
-                    const Text("Thumbnail Preview:", style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(_thumbnail!, width: double.infinity, height: 200, fit: BoxFit.cover),
+                        SizedBox(width: 10),
+                        Text("Generating title and description...", style: TextStyle(fontWeight: FontWeight.w500)),
+                      ],
                     ),
-                    const SizedBox(height: 16),
                   ],
 
-                  if (_recordedAudioPath != null) ...[
-                    const Text("Recorded Audio:", style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Text("🎤 ${_recordedAudioPath!.split('/').last}"),
-                    const SizedBox(height: 16),
-                  ] else if (_uploadedAudio != null) ...[
-                    const Text("Uploaded Audio:", style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Text("🎵 ${_uploadedAudio!.path.split('/').last}"),
-                    const SizedBox(height: 16),
-                  ],
-
-                  _inputField(hint: "Add Title", controller: _titleController),
+                  InputField(
+                    hint: "Add Title",
+                    fieldKey: "title_field",
+                    controller: _titleController,
+                  ),
                   const SizedBox(height: 16),
 
-                  _inputField(hint: "Description", controller: _descriptionController, maxLines: 4),
+                  InputField(
+                    hint: "Description",
+                    fieldKey: "description_field",
+                    controller: _descriptionController,
+                    maxLines: 4,
+                  ),
                   const SizedBox(height: 32),
 
-                  Center(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        if (_titleController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Please enter a title")),
-                          );
-                          return;
-                        }
-                        // 🔁 Upload logic goes here
-                      },
-                      icon: const Icon(Icons.upload, size: 18),
-                      label: const Text("Upload"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF0048),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
+                  if (_thumbnail != null)
+                    ThumbnailSelector(
+                      thumbnail: _thumbnail,
+                      onTap: _showThumbnailOptions,
                     ),
+
+                  const SizedBox(height: 32),
+                  UploadSubmit(
+                    onSubmit: _uploadSpot,
+                    isUploading: _isUploadingSpot,
                   ),
                 ],
               ),
             ),
           ),
-
           const GlassAppBar(),
         ],
       ),
       bottomNavigationBar: CustomBottomNav(
         currentIndex: _selectedIndex,
         onTap: (index) => setState(() => _selectedIndex = index),
-      ),
-    );
-  }
-
-  Widget _roundedButton({required IconData icon, required String text, required VoidCallback onTap}) {
-    return Expanded(
-      child: OutlinedButton.icon(
-        icon: Icon(icon, color: const Color(0xFFFF0048)),
-        label: Text(text, style: const TextStyle(color: Colors.black87)),
-        style: OutlinedButton.styleFrom(
-          backgroundColor: Colors.white,
-          side: const BorderSide(color: Colors.black12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-        onPressed: onTap,
-      ),
-    );
-  }
-
-  Widget _inputField({required String hint, required TextEditingController controller, int maxLines = 1}) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      style: const TextStyle(color: Colors.black87),
-      decoration: InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: Colors.white,
-        hintStyle: const TextStyle(color: Colors.black45),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.black12),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.black26),
-        ),
       ),
     );
   }
