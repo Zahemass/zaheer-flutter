@@ -26,7 +26,7 @@ android {
         applicationId = "com.example.sample_proj"
 
         // These are picked up from Flutter automatically
-        minSdk = flutter.minSdkVersion
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
