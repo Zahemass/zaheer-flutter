@@ -61,6 +61,152 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
     });
   }
 
+  String selectedLanguage = "English";
+
+  void _showLanguagePopup(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Center(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: GlassmorphicContainer(
+              width: 300,
+              height: 250,
+              borderRadius: 20,
+              blur: 20,
+              alignment: Alignment.center,
+              border: 1,
+              linearGradient: LinearGradient(
+                colors: [Colors.white.withOpacity(0.2), Colors.white.withOpacity(0.05)],
+              ),
+              borderGradient: LinearGradient(
+                colors: [Colors.white24, Colors.white10],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "Choose Language",
+                    style: GoogleFonts.montserrat(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.white,
+                      decoration: TextDecoration.none, // No underline
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _languageOption("English"),
+                  _languageOption("Hindi"),
+                  _languageOption("French"),
+                  _languageOption("German"),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _languageOption(String language) {
+    final isSelected = selectedLanguage == language;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          selectedLanguage = language;
+          Navigator.pop(context); // close popup
+        });
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          language,
+          style: GoogleFonts.montserrat(
+            fontSize: 14,
+            color: isSelected ? Colors.black : Colors.white,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            decoration: TextDecoration.none, // ✅ Ensures no underline on tap/select
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSummaryPopup(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Center(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: GlassmorphicContainer(
+              width: MediaQuery.of(context).size.width * 0.85,
+              height: 350,
+              borderRadius: 20,
+              blur: 20,
+              alignment: Alignment.center,
+              border: 1,
+              linearGradient: LinearGradient(
+                colors: [Colors.white.withOpacity(0.2), Colors.white.withOpacity(0.05)],
+              ),
+              borderGradient: LinearGradient(
+                colors: [Colors.white24, Colors.white10],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "📖 Title: Beautiful Chennai",
+                      style: GoogleFonts.montserrat(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      "✨ Summary: Chennai is known for its cultural heritage and stunning architecture.",
+                      style: GoogleFonts.montserrat(
+                        fontSize: 14,
+                        color: Colors.white70,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Text(
+                          "🌆 Paragraph:\nChennai, the capital of Tamil Nadu, offers a blend of tradition and modernity. It’s home to beautiful temples, beaches, and a rich cultural scene. The city embraces both classical art and contemporary tech culture, making it a unique destination for both tourists and locals.",
+                          style: GoogleFonts.montserrat(
+                            fontSize: 13,
+                            color: Colors.white,
+                            height: 1.5,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final String shortDescription = widget.description.length > 100
@@ -194,7 +340,7 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
             top: 110,
             right: 20,
             child: GestureDetector(
-              onTap: () => Navigator.pushNamed(context, '/summary'),
+              onTap: () => _showSummaryPopup(context),
               child: GlassmorphicContainer(
                 width: 45,
                 height: 45,
@@ -230,7 +376,11 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
                 const SizedBox(height: 16),
                 _glassIcon(Iconsax.location),
                 const SizedBox(height: 16),
-                _glassIcon(Iconsax.message_text),
+                GestureDetector(
+                  onTap: () => _showLanguagePopup(context),
+                  child: _glassIcon(Iconsax.message_text),
+                ),
+
               ],
             ),
           ),
@@ -239,7 +389,7 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
           Positioned(
             left: 16,
             right: 16,
-            bottom: isExpanded ? 300 : 90,
+            bottom: isExpanded ? MediaQuery.of(context).size.height * 0.4 : 90,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -267,24 +417,26 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
                     text: TextSpan(
                       style: GoogleFonts.montserrat(
                         color: Colors.white,
-                        fontSize: 14,
+                        fontSize: isExpanded ? 12 : 14, // Smaller when expanded
                       ),
                       children: [
                         TextSpan(
-                          text: isExpanded ? widget.description : shortDescription,
+                          text: shortDescription,
                         ),
                         if (widget.description.length > 100)
                           TextSpan(
                             text: isExpanded ? '  see less' : '... see more',
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: Colors.pinkAccent, // 🎯 Make it stand out
                               fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.none,
                             ),
                           ),
                       ],
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 8),
                 if (!isExpanded)
                   Row(
@@ -384,16 +536,39 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
                             ),
                             const SizedBox(height: 12),
                             Expanded(
-                              child: SingleChildScrollView(
-                                child: Text(
-                                  widget.description,
-                                  style: GoogleFonts.montserrat(
-                                    fontSize: 12,
-                                    color: Colors.white,
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      child: Text(
+                                        widget.description,
+                                        style: GoogleFonts.montserrat(
+                                          fontSize: 12,
+                                          color: Colors.white,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  const SizedBox(height: 10),
+                                  Center(
+                                    child: GestureDetector(
+                                      onTap: () => setState(() => isExpanded = false),
+                                      child: Text(
+                                        "see less",
+                                        style: GoogleFonts.montserrat(
+                                          color: Colors.pinkAccent,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          decoration: TextDecoration.none,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+
                           ],
                         ),
                       ),
