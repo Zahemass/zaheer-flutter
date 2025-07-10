@@ -5,6 +5,11 @@ import 'package:glassmorphism/glassmorphism.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import '../widgets/custom_bottom_nav.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+
 
 class PlayPostScreen extends StatefulWidget {
   final String username;
@@ -34,6 +39,110 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
   bool isExpanded = false;
   IconData currentControlIcon = Icons.pause;
 
+  String? imageUrl;        // From API
+  String? audioUrl;        // From API
+  late AudioPlayer audioPlayer;
+
+  late FlutterTts flutterTts;      // For TTS
+  bool isTtsMode = false;          // Tracks whether we’re in TTS mode
+  String? translationText;         // Holds translation from API
+
+
+  @override
+  void initState() {
+    super.initState();
+    audioPlayer = AudioPlayer();
+    flutterTts = FlutterTts();
+    flutterTts.setSpeechRate(0.5);
+    flutterTts.setVolume(1.0);
+    flutterTts.setPitch(1.0);
+    fetchSpotData();
+  }
+
+  String? summarySpotName;
+  String? summaryDescription;
+  String? summaryText;
+
+  Future<void> fetchSummary() async {
+    final apiUrl = Uri.parse(
+        'http://192.168.29.36:4000/returnsummary?username=${widget.username}&lat=${widget.latitude}&lon=${widget.longitude}');
+
+    try {
+      final response = await http.get(apiUrl);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          summarySpotName = data['spotname'];
+          summaryDescription = data['description'];
+          summaryText = data['summary'];
+        });
+      } else {
+        print('❌ Summary API Error: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Summary Fetch Exception: $e');
+    }
+  }
+
+
+  Future<void> fetchSpotData() async {
+    final apiUrl = Uri.parse(
+        'http://192.168.29.36:4000/fullspot?username=${widget.username}&lat=${widget.latitude}&lon=${widget.longitude}');
+
+    try {
+      final response = await http.get(apiUrl);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          imageUrl = data['image'];
+          audioUrl = data['audio'];
+        });
+        // Play audio automatically
+        await audioPlayer.play(UrlSource(audioUrl!));
+        await audioPlayer.setReleaseMode(ReleaseMode.loop); // 🔁 Loop audio
+
+      } else {
+        print('❌ API Error: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Fetch Exception: $e');
+    }
+  }
+
+  Future<void> fetchTranslationAndSpeak() async {
+    final apiUrl = Uri.parse(
+        'http://192.168.29.36:4000/translation?username=${widget.username}&lat=${widget.latitude}&lon=${widget.longitude}&lang=${selectedLanguage.toLowerCase()}'
+    );
+
+    try {
+      final response = await http.get(apiUrl);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        translationText = data['translation'];
+        isTtsMode = true;
+
+        // Stop audio playback
+        await audioPlayer.stop();
+
+        // Speak the translation
+        await flutterTts.speak(translationText!);
+        setState(() {
+          isPlaying = true;
+          currentControlIcon = Icons.pause;
+        });
+      } else {
+        print('❌ Translation API Error: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Translation Fetch Exception: $e');
+    }
+  }
+
+
+
   void _handleDoubleTap() {
     setState(() {
       isLiked = true;
@@ -47,12 +156,29 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
     });
   }
 
-  void _handleSingleTap() {
+  void _handleSingleTap() async {
     setState(() {
       isPlaying = !isPlaying;
-      currentControlIcon = isPlaying ? Icons.play_arrow : Icons.pause;
+      currentControlIcon = isPlaying ? Icons.pause : Icons.play_arrow;
       showControlIcon = true;
     });
+
+    if (isTtsMode) {
+      if (isPlaying) {
+        await flutterTts.speak(translationText!); // 🔥 Replay the TTS
+      } else {
+        await flutterTts.stop(); // 🔥 Stop speaking
+      }
+    }
+    else {
+      if (audioUrl != null) {
+        if (isPlaying) {
+          await audioPlayer.resume();
+        } else {
+          await audioPlayer.pause();
+        }
+      }
+    }
 
     Timer(const Duration(seconds: 1), () {
       if (mounted) {
@@ -60,6 +186,16 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
       }
     });
   }
+
+
+  @override
+  void dispose() {
+    audioPlayer.dispose();
+    flutterTts.stop();
+    super.dispose();
+  }
+
+
 
   String selectedLanguage = "English";
 
@@ -112,11 +248,29 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
   Widget _languageOption(String language) {
     final isSelected = selectedLanguage == language;
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         setState(() {
           selectedLanguage = language;
           Navigator.pop(context); // close popup
         });
+
+        if (selectedLanguage == "English") {
+          // Back to Audio Mode
+          if (isTtsMode) {
+            await flutterTts.stop();
+            isTtsMode = false;
+            if (audioUrl != null) {
+              await audioPlayer.play(UrlSource(audioUrl!));
+              setState(() {
+                isPlaying = true;
+                currentControlIcon = Icons.pause;
+              });
+            }
+          }
+        } else {
+          // Switch to TTS Mode
+          await fetchTranslationAndSpeak();
+        }
       },
       behavior: HitTestBehavior.opaque,
       child: Container(
@@ -139,18 +293,29 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
     );
   }
 
-  void _showSummaryPopup(BuildContext context) {
+  void _showSummaryPopup(BuildContext context) async {
+    await fetchSummary(); // Fetch the summary first
+
+    // 🔥 Stop any audio/TTS before showing summary
+    if (isTtsMode) {
+      await flutterTts.stop();
+      setState(() => isTtsMode = false);
+    }
+    if (audioUrl != null) {
+      await audioPlayer.pause();
+    }
+
     showDialog(
       context: context,
       builder: (context) {
         return Center(
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: GlassmorphicContainer(
-              width: MediaQuery.of(context).size.width * 0.85,
-              height: 350,
-              borderRadius: 20,
-              blur: 20,
+              width: MediaQuery.of(context).size.width * 0.95, // 📐 Bigger width
+              height: MediaQuery.of(context).size.height * 0.8, // 📐 Bigger height
+              borderRadius: 25,
+              blur: 25,
               alignment: Alignment.center,
               border: 1,
               linearGradient: LinearGradient(
@@ -164,34 +329,79 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Title
                     Text(
-                      "📖 Title: Beautiful Chennai",
+                      "📖 Title: ${summarySpotName ?? 'Loading...'}",
                       style: GoogleFonts.montserrat(
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                         decoration: TextDecoration.none,
                       ),
                     ),
                     const SizedBox(height: 12),
+
+                    // Description
                     Text(
-                      "✨ Summary: Chennai is known for its cultural heritage and stunning architecture.",
+                      "✨ Description: ${summaryDescription ?? 'Loading...'}",
                       style: GoogleFonts.montserrat(
-                        fontSize: 14,
+                        fontSize: 15,
                         color: Colors.white70,
                         decoration: TextDecoration.none,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
+
+                    // Summary Text (Scrollable)
                     Expanded(
                       child: SingleChildScrollView(
                         child: Text(
-                          "🌆 Paragraph:\nChennai, the capital of Tamil Nadu, offers a blend of tradition and modernity. It’s home to beautiful temples, beaches, and a rich cultural scene. The city embraces both classical art and contemporary tech culture, making it a unique destination for both tourists and locals.",
+                          "🌆 Summary:\n${summaryText ?? 'Loading summary...'}",
                           style: GoogleFonts.montserrat(
-                            fontSize: 13,
+                            fontSize: 14,
                             color: Colors.white,
-                            height: 1.5,
+                            height: 1.6,
                             decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Close Button
+                    Align(
+                      alignment: Alignment.center,
+                      child: GestureDetector(
+                        onTap: () async {
+                          Navigator.pop(context);
+
+                          // 🔥 Resume audio if it was playing before
+                          if (audioUrl != null) {
+                            await audioPlayer.resume();
+                          }
+                        },
+                        child: GlassmorphicContainer(
+                          width: 120,
+                          height: 40,
+                          borderRadius: 20,
+                          blur: 15,
+                          alignment: Alignment.center,
+                          border: 1,
+                          linearGradient: LinearGradient(
+                            colors: [Colors.white.withOpacity(0.3), Colors.white.withOpacity(0.1)],
+                          ),
+                          borderGradient: LinearGradient(
+                            colors: [Colors.white24, Colors.white10],
+                          ),
+                          child: Text(
+                            "Close",
+                            style: GoogleFonts.montserrat(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              decoration: TextDecoration.none,
+                            ),
                           ),
                         ),
                       ),
@@ -223,10 +433,23 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
             child: GestureDetector(
               onTap: _handleSingleTap,
               onDoubleTap: _handleDoubleTap,
-              child: Image.asset(
-                'assets/images/sample_bg.jpg',
+              child: imageUrl != null
+                  ? Image.network(
+                imageUrl!,
                 fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Icon(Icons.broken_image, color: Colors.white70, size: 60),
+                ),
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(
+                      child: CircularProgressIndicator(color: Colors.white));
+                },
+              )
+                  : const Center(
+                child: CircularProgressIndicator(color: Colors.white),
               ),
+
             ),
           ),
 
