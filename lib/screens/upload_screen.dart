@@ -10,7 +10,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
-
+import './user_profile_screen.dart';
+import './simple_map_screen.dart';
 import '../components/app_bar.dart';
 import '../components/category_chips.dart';
 import '../widgets/custom_bottom_nav.dart';
@@ -23,13 +24,17 @@ import 'package:sample_proj/widgets/thumbnail_selector.dart';
 
 
 class UploadScreen extends StatefulWidget {
-  const UploadScreen({super.key});
+  final String username;
+
+  const UploadScreen({super.key, required this.username});
 
   @override
   State<UploadScreen> createState() => _UploadScreenState();
 }
 
 class _UploadScreenState extends State<UploadScreen> {
+
+
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   int selectedCategoryIndex = 0;
@@ -278,6 +283,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
       final selectedCategory = categories[selectedCategoryIndex];
 
+      request.fields['username'] = widget.username;
       request.fields['spotname'] = _titleController.text.trim();
       request.fields['description'] = _descriptionController.text.trim();
       request.fields['category'] = selectedCategory;
@@ -429,7 +435,27 @@ class _UploadScreenState extends State<UploadScreen> {
       ),
       bottomNavigationBar: CustomBottomNav(
         currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
+        onTap: (index) {
+          if (index == 0) {
+            // Go to map screen
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SimpleMapScreen(username: widget.username),
+              ),
+            );
+          } else if (index == 2) {
+            // Go to profile screen
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => UserProfileScreen(username: widget.username),
+              ),
+            );
+          } else {
+            setState(() => _selectedIndex = index);
+          }
+        },
       ),
     );
   }

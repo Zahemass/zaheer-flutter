@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:sample_proj/screens/signup_screen.dart';
 import 'package:sample_proj/screens/welcome_page.dart';
 import 'package:sample_proj/screens/PlayPostScreen.dart';
+import 'package:sample_proj/screens/simple_map_screen.dart';
 
 
 void main() {
@@ -18,13 +20,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         fontFamily: 'Poppins',
       ),
-      home: PlayPostScreen(
-        username: 'Zaheer',
-        description: '“When you resume exercise after a break, your music ……”“When you resume exercise after a break, your music ……”“When you resume exercise after a break, your music ……”',
-        views: 12026,
-        latitude: 13.0827,
-        longitude: 80.2707,
-      ),
+      home: SignupScreen(),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'login_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import './simple_map_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -20,6 +21,25 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  bool _isLoading = false;
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Signup Failed"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            child: const Text("OK"),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
+
   @override
   void dispose() {
     _usernameController.dispose();
@@ -29,62 +49,38 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> signupUser() async {
-    print("📤 Sending signup request...");
+    setState(() => _isLoading = true); // Show loading spinner
 
-    final url = Uri.parse('http://localhost:4000/signup'); // Change IP if needed
+    final url = Uri.parse('http://192.168.29.68:4000/signup');
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
 
     try {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'username': _usernameController.text.trim(),
-          'password': _passwordController.text.trim(),
-        }),
+        body: json.encode({'username': username, 'password': password}),
       );
 
-      print("✅ Response received: ${response.statusCode}");
-
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print("🎉 Signup successful: $data");
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Signup successful! Redirecting to login...'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        await Future.delayed(const Duration(seconds: 1)); // Wait before navigating
-
+        // Navigate to map screen with username
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => LoginScreen()),
+          MaterialPageRoute(
+            builder: (_) => SimpleMapScreen(username: username),
+          ),
         );
       } else {
         final error = jsonDecode(response.body);
-        print("❌ Signup failed with status ${response.statusCode}");
-        print("❗ Error message: ${error['error']}");
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Signup failed: ${error['error']}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorDialog(error['error'] ?? 'Unknown error');
       }
     } catch (e) {
-      print("🚨 Exception occurred during signup: $e");
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Signup failed: Network error'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showErrorDialog('Network error occurred.');
+    } finally {
+      setState(() => _isLoading = false); // Hide loading spinner
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -103,28 +99,31 @@ class _SignupScreenState extends State<SignupScreen> {
           child: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  const SizedBox(height: 40),
-                  LiquidGlassContainer(
-                    width: size.width * 0.9,
-                    height: size.width * 0.93,
-                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-                    borderRadius: 25,
-                    backgroundKey: _backgroundKey,
-                    child: SingleChildScrollView(
-                      child: _buildFormContent(),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  _buildDividerWithText(),
-                  const SizedBox(height: 20),
-                  _buildSocialButtons(),
-                  const SizedBox(height: 20),
-                  _buildLoginText(),
-                ],
-              ),
-            ),
+              child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Column(
+        children: [
+        const SizedBox(height: 40),
+        LiquidGlassContainer(
+          width: size.width * 0.9,
+          height: size.width * 1.35,
+          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+          borderRadius: 25,
+          backgroundKey: _backgroundKey,
+          child: SingleChildScrollView(
+            child: _buildFormContent(),
+          ),
+        ),
+        const SizedBox(height: 30),
+        _buildDividerWithText(),
+        const SizedBox(height: 20),
+        _buildSocialButtons(),
+        const SizedBox(height: 20),
+        _buildLoginText(),
+        ],
+      ),
+
+    ),
           ),
         ),
       ),
