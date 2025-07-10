@@ -25,6 +25,8 @@ class SimpleMapScreen extends StatefulWidget {
 
 class _SimpleMapScreenState extends State<SimpleMapScreen> {
 
+  String? _selectedUsername;
+
   Set<Marker> _dynamicMarkers = {};
 
   @override
@@ -131,7 +133,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
   }
 
   Future<void> _fetchNearbySpots(double lat, double lon) async {
-    final url = Uri.parse("http://192.168.29.68:4000/nearby?lat=$lat&lng=$lon");
+    final url = Uri.parse("http://192.168.29.17:4000/nearby?lat=$lat&lng=$lon");
 
     try {
       final response = await http.get(url);
@@ -162,7 +164,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                 final lonStr = lng.toString();
 
                 final introUrl = Uri.parse(
-                    "http://192.168.29.68:4000/spotintro?username=$username&lat=$latStr&lon=$lonStr"
+                    "http://192.168.29.17:4000/spotintro?username=$username&lat=$latStr&lon=$lonStr"
                 );
 
                 final introResponse = await http.get(introUrl);
@@ -170,7 +172,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                   final introData = jsonDecode(introResponse.body);
 
                   setState(() {
-                    String? _selectedUsername = introData['username'];
+                    _selectedUsername = introData['username'];
                     _selectedTitle = introData['category']; // you can use spotname or category
                     _selectedDescription = introData['description'];
                     _selectedViews = introData['viewcount'];
@@ -493,6 +495,12 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                       }
                     },
                     onPlayTap: () {
+                      print('▶️ Playing post of: $_selectedUsername');
+                      print('▶️ Playing post of: $_selectedDescription');
+                      print('▶️ Playing post of: $_selectedViews');
+                      print('▶️ Playing post of: $_selectedCoordinates!.latitude');
+                      print('▶️ Playing post of: $_selectedCoordinates!.longitude');
+
                       if (_selectedCoordinates != null &&
                           _selectedDescription != null &&
                           _selectedViews != null &&
@@ -501,7 +509,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => PlayPostScreen(
-                              username: widget.username,
+                              username: _selectedUsername ?? widget.username, // ✅ dynamically set
                               description: _selectedDescription!,
                               views: _selectedViews!,
                               latitude: _selectedCoordinates!.latitude,
@@ -511,6 +519,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                         );
                       }
                     },
+
 
                   ),
                 ),
