@@ -25,8 +25,6 @@ class SimpleMapScreen extends StatefulWidget {
 
 class _SimpleMapScreenState extends State<SimpleMapScreen> {
 
-  String? _selectedUsername;
-
   Set<Marker> _dynamicMarkers = {};
 
   @override
@@ -133,23 +131,26 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
   }
 
   Future<void> _fetchNearbySpots(double lat, double lon) async {
-    final url = Uri.parse("http://192.168.29.17:4000/nearby?lat=$lat&lng=$lon");
+    final String selectedCategory = categories[selectedCategoryIndex];
+    final String categoryQuery = Uri.encodeComponent(selectedCategory);
+
+    final url = Uri.parse("http://172.20.10.2:4000/nearby?lat=$lat&lng=$lon&category=$categoryQuery");
 
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
 
-        final List<Map<String, dynamic>> foodSpots = List<Map<String, dynamic>>.from(
-          data.where((spot) => spot['category'] == 'Food'),
-        );
+        final List<Map<String, dynamic>> filteredSpots = List<Map<String, dynamic>>.from(data);
+
+        final String imagePath = categoryToPinImage[selectedCategory] ?? 'assets/images/pin_1.png';
 
         final BitmapDescriptor customIcon = await BitmapDescriptor.fromAssetImage(
           const ImageConfiguration(size: Size(60, 60)),
-          'assets/images/pin_1.png',
+          imagePath,
         );
 
-        final markers = foodSpots.map((spot) {
+        final markers = filteredSpots.map((spot) {
           final lat = spot['latitude'] as double;
           final lng = spot['longitude'] as double;
 
@@ -159,12 +160,12 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
             icon: customIcon,
             onTap: () async {
               try {
-                final username = spot['username']; // make sure this is available in backend data
+                final username = spot['username'];
                 final latStr = lat.toString();
                 final lonStr = lng.toString();
 
                 final introUrl = Uri.parse(
-                    "http://192.168.29.17:4000/spotintro?username=$username&lat=$latStr&lon=$lonStr"
+                    "http://172.20.10.2:4000/spotintro?username=$username&lat=$latStr&lon=$lonStr"
                 );
 
                 final introResponse = await http.get(introUrl);
@@ -172,8 +173,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                   final introData = jsonDecode(introResponse.body);
 
                   setState(() {
-                    _selectedUsername = introData['username'];
-                    _selectedTitle = introData['category']; // you can use spotname or category
+                    _selectedTitle = introData['category'];
                     _selectedDescription = introData['description'];
                     _selectedViews = introData['viewcount'];
                     _selectedCoordinates = LatLng(lat, lng);
@@ -185,32 +185,29 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                 print("⚠️ Error fetching spot intro: $e");
               }
             },
-
           );
         }).toSet();
 
         setState(() {
-          _backendNearbySpots = foodSpots;
+          _backendNearbySpots = filteredSpots;
           _dynamicMarkers = markers;
         });
 
-        print("✅ Food spots: $_backendNearbySpots");
+        print("✅ Spots for category '$selectedCategory': $_backendNearbySpots");
       } else {
-        print("❌ Failed to fetch nearby spots: ${response.statusCode}");
+        print("❌ Failed to fetch spots: ${response.statusCode}");
       }
     } catch (e) {
-      print("⚠️ Error fetching nearby spots: $e");
+      print("⚠️ Error fetching spots: $e");
     }
   }
+
 
 
   GoogleMapController? _googleMapController;
   LatLng? _liveLocation;
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _suggestions = [];
-
-  int selectedCategoryIndex = 0;
-  int _selectedIndex = 0;
 
   String? _selectedTitle;
   String? _selectedDescription;
@@ -219,39 +216,32 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
 
   Set<Polyline> _polylines = {}; // 🔹 For straight line drawing
 
+  int selectedCategoryIndex = 0;
+  int _selectedIndex = 0;
+
   final List<String> categories = [
-    "Food", "Fun", "History", "Hidden spots", "Art & Culture"
+    "Foodie Finds",
+    "Funny Tales",
+    "History Whishpers",
+    "Hidden spots",
+    "Art & Culture",
+    "Legends & Myths",
+    "Shopping Gems",
+    "Festive Movements"
   ];
 
-  List<Map<String, dynamic>> _backendNearbySpots = [];
-
-  final Map<String, List<Map<String, dynamic>>> categoryMarkers = {
-    "Food": [
-      {"name": "Burger Place 🍔", "lat": 13.0724, "lng": 80.2611, "description": "Tasty burgers", "views": 120},
-      {"name": "Taco Spot 🌮", "lat": 13.0732, "lng": 80.2634, "description": "Spicy tacos", "views": 95},
-      {"name": "Pizza Corner 🍕", "lat": 13.0717, "lng": 80.2592, "description": "Cheesy pizza", "views": 105},
-    ],
-    "Fun": [
-      {"name": "Arcade 🎮", "lat": 13.0739, "lng": 80.2645, "description": "Retro arcade games", "views": 88},
-      {"name": "Park 🎢", "lat": 13.0702, "lng": 80.2581, "description": "Relaxing park", "views": 140},
-      {"name": "Bowling 🎳", "lat": 13.0751, "lng": 80.2607, "description": "Modern bowling alley", "views": 102},
-    ],
-    "History": [
-      {"name": "Old Fort 🏰", "lat": 13.0720, "lng": 80.2650},
-      {"name": "Museum 🖼️", "lat": 13.0735, "lng": 80.2575},
-      {"name": "Historic Street 🛤️", "lat": 13.0705, "lng": 80.2620},
-    ],
-    "Hidden spots": [
-      {"name": "Secret Cafe ☕", "lat": 13.0710, "lng": 80.2600},
-      {"name": "Rooftop View 🌇", "lat": 13.0744, "lng": 80.2599},
-      {"name": "Hidden Library 📚", "lat": 13.0728, "lng": 80.2630},
-    ],
-    "Art & Culture": [
-      {"name": "Gallery 🎨", "lat": 13.0737, "lng": 80.2588},
-      {"name": "Street Art 🖌️", "lat": 13.0708, "lng": 80.2641},
-      {"name": "Cultural Hall 🎭", "lat": 13.0722, "lng": 80.2615},
-    ]
+  final Map<String, String> categoryToPinImage = {
+    "Foodie Finds": "assets/images/pin_1.png",
+    "Funny Tales": "assets/images/funnytales.png",
+    "History Whishpers": "assets/images/historywhishpers.png",
+    "Hidden spots": "assets/images/hiddenspots.png",
+    "Art & Culture": "assets/images/art&culture.png",
+    "Legends & Myths": "assets/images/legends&myths.png",
+    "Shopping Gems": "assets/images/shoppinggems.png",
+    "Festive Movements": "assets/images/festivemovements.png",
   };
+
+  List<Map<String, dynamic>> _backendNearbySpots = [];
 
 
   Future<void> _fetchSuggestions(String input) async {
@@ -415,16 +405,10 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                   setState(() {
                     selectedCategoryIndex = index;
                     final selectedCategory = categories[index];
-                    final newMarkers = categoryMarkers[selectedCategory];
-                    if (newMarkers != null && newMarkers.isNotEmpty) {
-                      final firstMarker = newMarkers.first;
-                      _googleMapController?.animateCamera(
-                        CameraUpdate.newLatLngZoom(
-                          LatLng(firstMarker['lat'], firstMarker['lng']),
-                          15,
-                        ),
-                      );
+                    if (_liveLocation != null) {
+                      _fetchNearbySpots(_liveLocation!.latitude, _liveLocation!.longitude);
                     }
+
                   });
                 },
               ),
@@ -495,12 +479,6 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                       }
                     },
                     onPlayTap: () {
-                      print('▶️ Playing post of: $_selectedUsername');
-                      print('▶️ Playing post of: $_selectedDescription');
-                      print('▶️ Playing post of: $_selectedViews');
-                      print('▶️ Playing post of: $_selectedCoordinates!.latitude');
-                      print('▶️ Playing post of: $_selectedCoordinates!.longitude');
-
                       if (_selectedCoordinates != null &&
                           _selectedDescription != null &&
                           _selectedViews != null &&
@@ -509,7 +487,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => PlayPostScreen(
-                              username: _selectedUsername ?? widget.username, // ✅ dynamically set
+                              username: widget.username,
                               description: _selectedDescription!,
                               views: _selectedViews!,
                               latitude: _selectedCoordinates!.latitude,
@@ -519,7 +497,6 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                         );
                       }
                     },
-
 
                   ),
                 ),
