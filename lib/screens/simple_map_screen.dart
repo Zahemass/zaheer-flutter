@@ -130,11 +130,62 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
     }
   }
 
+  Future<void> _fetchSearchedSpots(String searchQuery) async {
+    final url = Uri.parse("http://192.168.29.17:4000/search-spots");
+    try {
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"SearchQuery": searchQuery}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List spots = data['spots'];
+
+        final String imagePath = categoryToPinImage[categories[selectedCategoryIndex]] ?? 'assets/images/pin_1.png';
+
+        final BitmapDescriptor customIcon = await BitmapDescriptor.fromAssetImage(
+          const ImageConfiguration(size: Size(60, 60)),
+          imagePath,
+        );
+
+        final markers = spots.map<Marker>((spot) {
+          final lat = spot['latitude'] as double;
+          final lng = spot['longitude'] as double;
+
+          return Marker(
+            markerId: MarkerId(spot['spotname']),
+            position: LatLng(lat, lng),
+            icon: customIcon,
+            onTap: () {
+              setState(() {
+                _selectedTitle = spot['spotname'];
+                _selectedDescription = spot['description'] ?? '';
+                _selectedViews = spot['viewcount'] ?? 0;
+                _selectedCoordinates = LatLng(lat, lng);
+              });
+            },
+          );
+        }).toSet();
+
+        setState(() {
+          _dynamicMarkers = markers;
+          _backendNearbySpots = List<Map<String, dynamic>>.from(spots);
+        });
+      } else {
+        print("❌ Failed to fetch searched spots: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("⚠️ Error fetching searched spots: $e");
+    }
+  }
+
   Future<void> _fetchNearbySpots(double lat, double lon) async {
     final String selectedCategory = categories[selectedCategoryIndex];
     final String categoryQuery = Uri.encodeComponent(selectedCategory);
 
-    final url = Uri.parse("http://172.20.10.2:4000/nearby?lat=$lat&lng=$lon&category=$categoryQuery");
+    final url = Uri.parse("http://192.168.29.17:4000/nearby?lat=$lat&lng=$lon&SearchQuery=$categoryQuery");
 
     try {
       final response = await http.get(url);
@@ -261,14 +312,20 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
     final lat = double.parse(suggestion['lat']);
     final lon = double.parse(suggestion['lon']);
     final selected = LatLng(lat, lon);
+    final query = suggestion['display_name'];
+
     setState(() {
-      _searchController.text = suggestion['display_name'];
+      _searchController.text = query;
       _suggestions = [];
     });
+
     _googleMapController?.animateCamera(
       CameraUpdate.newLatLngZoom(selected, 15),
     );
+
+    await _fetchSearchedSpots(query); // 👈 fetch backend data for searched location
   }
+
 
   void _drawStraightLine(LatLng start, LatLng end) {
     getRoutePolyline(start, end);
