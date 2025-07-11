@@ -65,7 +65,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
 
 
   Future<void> getRoutePolyline(LatLng origin, LatLng destination) async {
-    const apiKey = 'AIzaSyCAyzR1ADbmpK-uyfm4Uhg8QGjgDwHVcFQ'; // 🔁 Replace this
+    const apiKey = 'AIzaSyAMz0YusgtkPO3oyemCNGDqoydq5T3S3nw'; // 🔁 Replace this
     final url = Uri.parse(
       'https://maps.googleapis.com/maps/api/directions/json'
           '?origin=${origin.latitude},${origin.longitude}'
