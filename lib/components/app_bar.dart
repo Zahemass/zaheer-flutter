@@ -20,7 +20,7 @@ class GlassAppBar extends StatelessWidget {
         linearGradient: LinearGradient(
           colors: [
             Colors.white.withOpacity(0.1),
-            Colors.white38.withOpacity(0.1)
+            Colors.white38.withOpacity(0.1),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -28,16 +28,25 @@ class GlassAppBar extends StatelessWidget {
         borderGradient: const LinearGradient(
           colors: [Colors.white24, Colors.white10],
         ),
-        child: Center(
-          child: RichText(
-            text: const TextSpan(
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              children: [
-                TextSpan(text: 'Local ', style: TextStyle(color: Colors.black)),
-                TextSpan(text: 'Lens', style: TextStyle(color: Colors.red)),
-              ],
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/images/logo.png',
+              height: 32,
+              width: 32,
             ),
-          ),
+            const SizedBox(width: 8),
+             RichText(
+              text: TextSpan(
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                children: [
+                  TextSpan(text: 'Local ', style: TextStyle(color: Colors.black)),
+                  TextSpan(text: 'Lens', style: TextStyle(color: Colors.red)),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
