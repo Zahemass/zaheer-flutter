@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../screens/LocationPickerScreen.dart';
 
 class LocationSelector extends StatefulWidget {
@@ -70,28 +69,25 @@ class _LocationSelectorState extends State<LocationSelector> {
           const SizedBox(height: 16),
           SizedBox(
             height: 150,
-            child: FlutterMap(
-              options: MapOptions(
-                initialCenter: selectedLatLng,
-                initialZoom: 13,
-                interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: selectedLatLng,
+                zoom: 14,
               ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  subdomains: ['a', 'b', 'c'],
-                ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: selectedLatLng,
-                      width: 40,
-                      height: 40,
-                      child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
-                    ),
-                  ],
-                ),
-              ],
+              markers: {
+                Marker(
+                  markerId: const MarkerId("preview"),
+                  position: selectedLatLng,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                )
+              },
+              zoomControlsEnabled: false,
+              scrollGesturesEnabled: false,
+              rotateGesturesEnabled: false,
+              tiltGesturesEnabled: false,
+              zoomGesturesEnabled: false,
+              myLocationButtonEnabled: false,
+              onMapCreated: (controller) {},
             ),
           ),
           const SizedBox(height: 8),
