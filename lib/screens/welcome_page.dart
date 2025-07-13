@@ -25,6 +25,7 @@ class _WelcomePageState extends State<WelcomePage> {
         currentPage++;
       } else {
         // Navigate to next screen on last page
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SignupScreen()));
       }
     });
   }
@@ -67,11 +68,12 @@ class _WelcomePageState extends State<WelcomePage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
-                              Icons.camera,
-                              size: 40,
-                              color: Colors.black,
+                            Image.asset(
+                              'assets/images/logo.png',
+                              height: 40,
+                              width: 40,
                             ),
+
                             const SizedBox(height: 20),
                             RichText(
                               textAlign: TextAlign.center,
@@ -82,7 +84,7 @@ class _WelcomePageState extends State<WelcomePage> {
                                   color: Colors.black,
                                 ),
                                 children: [
-                                  TextSpan(text: 'Welcome, '),
+                                  const TextSpan(text: 'Welcome, '),
                                   TextSpan(
                                     text: 'To\nLocal Lens',
                                     style: GoogleFonts.montserrat(
@@ -101,7 +103,8 @@ class _WelcomePageState extends State<WelcomePage> {
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.montserrat(
                                   fontSize: 16,
-                                    fontWeight: FontWeight.w500
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black,
                                 ),
                               ),
                             ),
@@ -110,6 +113,7 @@ class _WelcomePageState extends State<WelcomePage> {
                               '$currentPage/3',
                               style: GoogleFonts.montserrat(
                                 fontSize: 16,
+                                color: Colors.black,
                               ),
                             ),
                           ],
@@ -150,7 +154,7 @@ class _WelcomePageState extends State<WelcomePage> {
                   InkWell(
                     onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => SignupScreen()),
+                        MaterialPageRoute(builder: (context) => const SignupScreen()),
                       );
                     },
                     child: ClipRRect(
@@ -172,10 +176,10 @@ class _WelcomePageState extends State<WelcomePage> {
                               width: 1.5,
                             ),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Text(
                               'GET START',
-                              style: TextStyle(
+                              style: GoogleFonts.montserrat(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
@@ -189,7 +193,7 @@ class _WelcomePageState extends State<WelcomePage> {
                   const SizedBox(height: 15),
                   RichText(
                     text: TextSpan(
-                      text: 'Already have an account ? ',
+                      text: 'Already have an account? ',
                       style: GoogleFonts.montserrat(
                         color: Colors.black,
                       ),
@@ -198,7 +202,7 @@ class _WelcomePageState extends State<WelcomePage> {
                           child: GestureDetector(
                             onTap: () {
                               Navigator.of(context).push(
-                                MaterialPageRoute(builder: (context) => LoginScreen()),
+                                MaterialPageRoute(builder: (context) => const LoginScreen()),
                               );
                             },
                             child: Text(
