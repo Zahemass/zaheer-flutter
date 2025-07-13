@@ -12,6 +12,10 @@ import 'package:sample_proj/components/GlassDetailBottomSheet.dart';
 import 'package:sample_proj/screens/user_profile_screen.dart';
 import './upload_screen.dart';
 import './PlayPostScreen.dart'; // Adjust path as needed
+import 'dart:ui' as ui; // Required for instantiateImageCodec
+import 'dart:typed_data';
+
+
 
 
 class SimpleMapScreen extends StatefulWidget {
@@ -26,6 +30,8 @@ class SimpleMapScreen extends StatefulWidget {
 class _SimpleMapScreenState extends State<SimpleMapScreen> {
 
   Set<Marker> _dynamicMarkers = {};
+  String? _selectedSpotUsername;
+
 
   @override
   void initState() {
@@ -121,6 +127,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
       final position = await Geolocator.getCurrentPosition();
       final currentLoc = LatLng(position.latitude, position.longitude);
       setState(() => _liveLocation = currentLoc);
+      await _loadProfileMarkerIcon();
       _fetchNearbySpots(currentLoc.latitude, currentLoc.longitude);
     } catch (e) {
       // 👇 Fallback in case of any error while getting location
@@ -128,10 +135,75 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
       _fetchNearbySpots(defaultLocation.latitude, defaultLocation.longitude);
       print("⚠️ Location fetch failed, fallback to Egmore: $e");
     }
+
+
   }
 
+  Future<void> _loadProfileMarkerIcon() async {
+    final url = Uri.parse("http://192.168.29.68:4000/profilepicreturn"); // Update if needed
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"username": widget.username}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final profilePicUrl = data['profile_image'];
+
+        if (profilePicUrl != null && profilePicUrl.isNotEmpty) {
+          final imageResponse = await http.get(Uri.parse(profilePicUrl));
+          if (imageResponse.statusCode == 200) {
+            final Uint8List imageBytes = imageResponse.bodyBytes;
+
+            // Decode image and resize
+            final ui.Codec codec = await ui.instantiateImageCodec(
+              imageBytes,
+              targetWidth: 100,
+              targetHeight: 100,
+            );
+            final ui.FrameInfo frame = await codec.getNextFrame();
+            final ui.Image originalImage = frame.image;
+
+            // Create circular image
+            final ui.PictureRecorder recorder = ui.PictureRecorder();
+            final Canvas canvas = Canvas(recorder);
+            final Paint paint = Paint()..isAntiAlias = true;
+
+            final double radius = 50;
+            final Rect rect = Rect.fromLTWH(0, 0, 100, 100);
+            final RRect rRect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
+
+            canvas.clipRRect(rRect);
+            canvas.drawImage(originalImage, Offset.zero, paint);
+
+            final ui.Image circularImage = await recorder.endRecording().toImage(100, 100);
+            final ByteData? byteData = await circularImage.toByteData(format: ui.ImageByteFormat.png);
+
+            if (byteData != null) {
+              final Uint8List markerIconBytes = byteData.buffer.asUint8List();
+
+              setState(() {
+                _profileMarkerIcon = BitmapDescriptor.fromBytes(markerIconBytes);
+              });
+            }
+          }
+        }
+      } else {
+        print("❌ API error: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("⚠️ Exception in loading marker icon: $e");
+    }
+  }
+
+
+
+
   Future<void> _fetchSearchedSpots(String searchQuery) async {
-    final url = Uri.parse("http://192.168.29.17:4000/search-spots");
+    final url = Uri.parse("http:// 192.168.29.68:4000/search-spots");
     try {
       final response = await http.post(
         url,
@@ -164,6 +236,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                 _selectedDescription = spot['description'] ?? '';
                 _selectedViews = spot['viewcount'] ?? 0;
                 _selectedCoordinates = LatLng(lat, lng);
+                _selectedSpotUsername = spot['username'];
               });
             },
           );
@@ -185,7 +258,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
     final String selectedCategory = categories[selectedCategoryIndex];
     final String categoryQuery = Uri.encodeComponent(selectedCategory);
 
-    final url = Uri.parse("http://192.168.29.17:4000/nearby?lat=$lat&lng=$lon&SearchQuery=$categoryQuery");
+    final url = Uri.parse("http://192.168.29.68:4000/nearby?lat=$lat&lng=$lon&SearchQuery=$categoryQuery");
 
     try {
       final response = await http.get(url);
@@ -216,7 +289,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                 final lonStr = lng.toString();
 
                 final introUrl = Uri.parse(
-                    "http://172.20.10.2:4000/spotintro?username=$username&lat=$latStr&lon=$lonStr"
+                    "http://192.168.29.68:4000/spotintro?username=$username&lat=$latStr&lon=$lonStr"
                 );
 
                 final introResponse = await http.get(introUrl);
@@ -228,6 +301,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                     _selectedDescription = introData['description'];
                     _selectedViews = introData['viewcount'];
                     _selectedCoordinates = LatLng(lat, lng);
+                    _selectedSpotUsername = username;
                   });
                 } else {
                   print("❌ Failed to fetch spot intro: ${introResponse.statusCode}");
@@ -259,7 +333,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
   LatLng? _liveLocation;
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _suggestions = [];
-
+  BitmapDescriptor? _profileMarkerIcon; // 👈 Add this
   String? _selectedTitle;
   String? _selectedDescription;
   int? _selectedViews;
@@ -389,12 +463,13 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                 myLocationEnabled: true,
                 myLocationButtonEnabled: true,
                 markers: {
-                  Marker(
-                    markerId: const MarkerId("live"),
-                    position: _liveLocation!,
-                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-                    infoWindow: const InfoWindow(title: "Your Location"),
-                  ),
+                  if (_liveLocation != null)
+                    Marker(
+                      markerId: const MarkerId("live"),
+                      position: _liveLocation!,
+                      icon: _profileMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+                      infoWindow: const InfoWindow(title: "You"),
+                    ),
                   ..._dynamicMarkers, // 👈 We'll define this below
                 },
                 polylines: _polylines,
@@ -539,12 +614,16 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                       if (_selectedCoordinates != null &&
                           _selectedDescription != null &&
                           _selectedViews != null &&
-                          _selectedTitle != null) {
+                          _selectedTitle != null)
+
+                        print("▶️ Spot Username: $_selectedSpotUsername");
+
+                      {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => PlayPostScreen(
-                              username: widget.username,
+                              username: _selectedSpotUsername ?? widget.username,
                               description: _selectedDescription!,
                               views: _selectedViews!,
                               latitude: _selectedCoordinates!.latitude,
@@ -553,6 +632,15 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                           ),
                         );
                       }
+                    },
+                    onCloseTap: () {
+                      setState(() {
+                        _selectedTitle = null;
+                        _selectedDescription = null;
+                        _selectedViews = null;
+                        _selectedCoordinates = null;
+                        _polylines.clear(); // optional: clear route
+                      });
                     },
 
                   ),
