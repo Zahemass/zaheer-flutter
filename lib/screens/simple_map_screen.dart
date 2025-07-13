@@ -14,6 +14,10 @@ import './upload_screen.dart';
 import './PlayPostScreen.dart'; // Adjust path as needed
 import 'dart:ui' as ui; // Required for instantiateImageCodec
 import 'dart:typed_data';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:string_similarity/string_similarity.dart';
+
 
 
 
@@ -32,12 +36,116 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
   Set<Marker> _dynamicMarkers = {};
   String? _selectedSpotUsername;
 
+  late stt.SpeechToText _speech;
+  bool _isListening = false;
+  String _voiceInput = '';
+
+  final FlutterTts _flutterTts = FlutterTts();
+
+  String _normalize(String text) {
+    return text.toLowerCase().replaceAll(RegExp(r'[^a-z0-9 ]'), '').replaceAll('&', 'and').trim();
+  }
+
 
   @override
   void initState() {
     super.initState();
     _initLocation();
+    _speech = stt.SpeechToText();
+
   }
+
+  void _startListening() async {
+    if (_isListening) {
+      await _speech.stop();
+      setState(() => _isListening = false);
+      return;
+    }
+
+    bool available = await _speech.initialize(
+      onStatus: (status) {
+        print("🎙️ Speech status: $status");
+        if (status == 'done') {
+          setState(() => _isListening = false);
+        }
+      },
+      onError: (error) {
+        print("❌ Speech error: $error");
+      },
+    );
+
+    if (available) {
+      setState(() {
+        _isListening = true;
+        _voiceInput = '';
+      });
+
+      print("🎤 Listening...");
+
+      _speech.listen(
+        listenMode: stt.ListenMode.dictation,
+        pauseFor: const Duration(seconds: 3),
+        listenFor: const Duration(seconds: 10),
+        onResult: (result) async {
+          if (result.finalResult) {
+            final spokenRaw = result.recognizedWords.trim();
+            final normalizedSpoken = _normalize(spokenRaw);
+            print("🎤 Spoken raw: '$spokenRaw'");
+            print("🔎 Normalized spoken: '$normalizedSpoken'");
+
+            double bestMatchScore = 0;
+            int? bestMatchIndex;
+
+            for (int i = 0; i < categories.length; i++) {
+              final normalizedCategory = _normalize(categories[i]);
+              print("➡️ Checking against: '$normalizedCategory'");
+
+              double score = normalizedSpoken.similarityTo(normalizedCategory);
+
+              if (score > bestMatchScore) {
+                bestMatchScore = score;
+                bestMatchIndex = i;
+              }
+            }
+
+            print("✅ Best match index: $bestMatchIndex with score $bestMatchScore");
+
+            if (bestMatchScore > 0.6 && bestMatchIndex != null) {
+              final categoryName = categories[bestMatchIndex];
+              if (bestMatchIndex != null) {
+                setState(() => selectedCategoryIndex = bestMatchIndex!);
+              }
+
+              await _flutterTts.speak("Showing the $categoryName near by you");
+
+              if (_liveLocation != null) {
+                await _fetchNearbySpots(
+                  _liveLocation!.latitude,
+                  _liveLocation!.longitude,
+                );
+              }
+            } else {
+              print("❌ No matching category found");
+              await _flutterTts.speak("Sorry, I couldn't find any category like that.");
+            }
+
+            await _speech.stop();
+            setState(() => _isListening = false);
+          }
+        },
+      );
+    } else {
+      print("❌ Speech recognition not available");
+    }
+  }
+
+
+
+
+
+
+
+
   List<LatLng> _decodePolyline(String encoded) {
     List<LatLng> polyline = [];
     int index = 0, len = encoded.length;
@@ -346,7 +454,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
 
   final List<String> categories = [
     "Foodie Finds",
-    "Funny Tales",
+    "Funny Tail",
     "History Whishpers",
     "Hidden spots",
     "Art & Culture",
@@ -357,7 +465,7 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
 
   final Map<String, String> categoryToPinImage = {
     "Foodie Finds": "assets/images/pin_1.png",
-    "Funny Tales": "assets/images/funnytales.png",
+    "Funny Tail": "assets/images/funnytales.png",
     "History Whishpers": "assets/images/historywhishpers.png",
     "Hidden spots": "assets/images/hiddenspots.png",
     "Art & Culture": "assets/images/art&culture.png",
@@ -450,7 +558,10 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
           }
         },
         child: Stack(
+
           children: [
+
+
             if (_liveLocation == null)
               const Center(child: CircularProgressIndicator())
             else
@@ -475,7 +586,19 @@ class _SimpleMapScreenState extends State<SimpleMapScreen> {
                 polylines: _polylines,
               ),
 
+            Positioned(
+              bottom: 160,
+              right: 20,
+              child: FloatingActionButton(
+                backgroundColor: Colors.black87,
+                onPressed: _startListening,
+                child: Icon(
+                  _isListening ? Icons.mic_none : Icons.mic,
+                  color: Colors.white,
+                ),
 
+              ),
+            ),
             const GlassAppBar(),
 
             Positioned(
