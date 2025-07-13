@@ -1,15 +1,17 @@
-// ✅ FULLY UPDATED CODE
-// - profile_image from backend shown
-// - PostPointsRow and PostCard made dynamic
+// ✅ FULLY UPDATED CODE with Dropdown Glass Logout Popup
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../components/app_bar.dart';
 import 'dart:ui';
+import 'package:sample_proj/screens/login_screen.dart';
 import 'package:sample_proj/widgets/custom_bottom_nav.dart';
 import 'simple_map_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:sample_proj/screens/upload_screen.dart';
+import 'package:sample_proj/widgets/glass_delete_popup.dart'; // ✅ Import the widget
+
 
 class UserProfileScreen extends StatefulWidget {
   final String username;
@@ -26,6 +28,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   int badgeScore = 0;
   List<Map<String, dynamic>> uploadedSpots = [];
   bool isLoading = true;
+  bool _showLogoutPopup = false;
 
   @override
   void initState() {
@@ -34,7 +37,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Future<void> fetchUserProfile(String username) async {
-    final url = Uri.parse("http://192.168.29.17:4000/return-profile");
+    setState(() {
+      isLoading = true;
+      uploadedSpots.clear(); // ✅ clear old posts
+    });
+
+    final url = Uri.parse("http://192.168.29.68:4000/return-profile");
 
     try {
       final response = await http.post(
@@ -55,127 +63,210 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           isLoading = false;
         });
       } else {
-        print("❌ Failed: ${response.statusCode}");
+        print("❌ Failed: \${response.statusCode}");
       }
     } catch (e) {
-      print("⚠️ Error fetching profile: $e");
+      print("⚠️ Error fetching profile: \$e");
     }
   }
 
   int _selectedIndex = 2;
 
+  Future<void> _deletePost(int id) async {
+    final url = Uri.parse("http://192.168.29.68:4000/delete-post?id=$id");
+
+    try {
+      final response = await http.delete(url); // 👈 Use DELETE
+
+      if (response.statusCode == 200) {
+        print("✅ Post deleted successfully");
+
+        // Refresh UI by re-fetching profile
+        fetchUserProfile(widget.username);
+      } else {
+        print("❌ Failed to delete: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("⚠️ Error deleting post: $e");
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8E8EE),
-      body: Column(
-        children: [
-          const GlassAppBar(),
-          const SizedBox(height: 20),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 90,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black12,
-                    image: profileImageUrl != null
-                        ? DecorationImage(
-                      image: NetworkImage(profileImageUrl!),
-                      fit: BoxFit.cover,
-                    )
-                        : null,
-                  ),
-                  child: profileImageUrl == null
-                      ? const Center(child: Icon(Icons.person, size: 45, color: Colors.black54))
-                      : null,
-                ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    Text(
-                      fetchedUsername ?? widget.username,
-                      style: GoogleFonts.montserrat(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    GlassButton(
-                      text: "Edit profile",
-                      onTap: () {},
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.black38,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 6,
-                        offset: Offset(2, 2),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white.withOpacity(0.4), width: 1),
+    return GestureDetector(
+      onTap: () => setState(() => _showLogoutPopup = false),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8E8EE),
+        body: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 80),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const GlassAppBar(),
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 90,
+                          height: 90,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.black12,
+                            image: profileImageUrl != null
+                                ? DecorationImage(
+                              image: NetworkImage(profileImageUrl!),
+                              fit: BoxFit.cover,
+                            )
+                                : null,
+                          ),
+                          child: profileImageUrl == null
+                              ? const Center(child: Icon(Icons.person, size: 45, color: Colors.black54))
+                              : null,
                         ),
-                        child: const Icon(Icons.settings, color: Colors.black),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 8),
+                            Text(
+                              fetchedUsername ?? widget.username,
+                              style: GoogleFonts.montserrat(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            GlassButton(
+                              text: "Edit profile",
+                              onTap: () {},
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () => setState(() => _showLogoutPopup = !_showLogoutPopup),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.black38,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 6,
+                                  offset: Offset(2, 2),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.white.withOpacity(0.4), width: 1),
+                                  ),
+                                  child: const Icon(Icons.settings, color: Colors.black),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+                  PostPointsRow(postCount: postCount, badgeScore: badgeScore),
+                  const SizedBox(height: 20),
+                  if (!isLoading)
+                    ...uploadedSpots.map((spot) => PostCard(
+                      id: spot['id'],
+                      title: spot['title'],
+                      views: spot['viewscount'],
+                      likes: spot['likescount'],
+                      imageUrl: spot['spotimage'],
+                      onDelete: () {
+                        _deletePost(spot['id']); // 👈 Call delete function
+                      },
+                    )),
+                ],
+              ),
+            ),
+            if (_showLogoutPopup)
+              Positioned(
+                top: 75,
+                right: 60,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withOpacity(0.5)),
+                      ),
+                      child: GestureDetector(
+                        onTap: () {
+                          print("Logout tapped");
+                          setState(() => _showLogoutPopup = false);
+
+                          // Navigate to LoginScreen
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (context) => const LoginScreen()),
+                          );
+                        },
+
+                        child: Text(
+                          "Logout",
+                          style: GoogleFonts.montserrat(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                            color: Colors.black,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-          PostPointsRow(postCount: postCount, badgeScore: badgeScore),
-          const SizedBox(height: 20),
-
-          if (!isLoading)
-            ...uploadedSpots.map((spot) => PostCard(
-              title: spot['title'],
-              views: spot['viewscount'],
-              likes: spot['likescount'],
-              imageUrl: spot['spotimage'],
-            )),
-        ],
-      ),
-      bottomNavigationBar: CustomBottomNav(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SimpleMapScreen(username: widget.username),
               ),
-            );
-          } else {
-            setState(() => _selectedIndex = index);
-          }
-        },
+          ],
+        ),
+        bottomNavigationBar: CustomBottomNav(
+          currentIndex: _selectedIndex,
+          onTap: (index) {
+            if (index == 0) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SimpleMapScreen(username: widget.username),
+                ),
+              );
+            } else if (index == 1) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => UploadScreen(username: widget.username),
+                ),
+              );
+            } else {
+              setState(() => _selectedIndex = index);
+            }
+          },
+        ),
       ),
     );
   }
@@ -218,6 +309,11 @@ class GlassButton extends StatelessWidget {
     );
   }
 }
+
+// PostPointsRow and PostCard remain unchanged
+
+// (Retain your PostPointsRow and PostCard definitions here)
+
 
 class PostPointsRow extends StatelessWidget {
   final int postCount;
@@ -293,7 +389,18 @@ class PostCard extends StatelessWidget {
   final int views;
   final int likes;
   final String imageUrl;
-  const PostCard({super.key, required this.title, required this.views, required this.likes, required this.imageUrl});
+  final int id;
+  final VoidCallback onDelete;
+
+  const PostCard({
+    super.key,
+    required this.title,
+    required this.views,
+    required this.likes,
+    required this.imageUrl,
+    required this.id,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +446,11 @@ class PostCard extends StatelessWidget {
               ),
             ),
             IconButton(
-              onPressed: () {},
+              onPressed: () {
+                showDeleteGlassPopup(context, () {
+                  onDelete(); // 👈 Call delete
+                });
+              },
               icon: const Icon(Icons.more_vert, color: Colors.black),
             ),
           ],
@@ -348,4 +459,5 @@ class PostCard extends StatelessWidget {
     );
   }
 }
+
 
