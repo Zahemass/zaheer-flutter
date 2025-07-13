@@ -10,7 +10,7 @@ import 'simple_map_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:sample_proj/screens/upload_screen.dart';
-import 'package:sample_proj/widgets/glass_delete_popup.dart'; // ✅ Import the widget
+import '../widgets/Postcard.dart';
 
 
 class UserProfileScreen extends StatefulWidget {
