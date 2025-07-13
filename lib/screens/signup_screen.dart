@@ -39,7 +39,6 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-
   @override
   void dispose() {
     _usernameController.dispose();
@@ -49,11 +48,12 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> signupUser() async {
-    setState(() => _isLoading = true); // Show loading spinner
-
-    final url = Uri.parse('http://192.168.29.68:4000/signup');
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
+
+    setState(() => _isLoading = true);
+
+    final url = Uri.parse('http://192.168.29.68:4000/signup');
 
     try {
       final response = await http.post(
@@ -63,7 +63,6 @@ class _SignupScreenState extends State<SignupScreen> {
       );
 
       if (response.statusCode == 200) {
-        // Navigate to map screen with username
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -77,10 +76,9 @@ class _SignupScreenState extends State<SignupScreen> {
     } catch (e) {
       _showErrorDialog('Network error occurred.');
     } finally {
-      setState(() => _isLoading = false); // Hide loading spinner
+      setState(() => _isLoading = false);
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -99,31 +97,28 @@ class _SignupScreenState extends State<SignupScreen> {
           child: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
-              child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : Column(
-        children: [
-        const SizedBox(height: 40),
-        LiquidGlassContainer(
-          width: size.width * 0.9,
-          height: size.width * 1.35,
-          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-          borderRadius: 25,
-          backgroundKey: _backgroundKey,
-          child: SingleChildScrollView(
-            child: _buildFormContent(),
-          ),
-        ),
-        const SizedBox(height: 30),
-        _buildDividerWithText(),
-        const SizedBox(height: 20),
-        _buildSocialButtons(),
-        const SizedBox(height: 20),
-        _buildLoginText(),
-        ],
-      ),
-
-    ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 40),
+                  LiquidGlassContainer(
+                    width: size.width * 0.9,
+                    height: size.width * 1.35,
+                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                    borderRadius: 25,
+                    backgroundKey: _backgroundKey,
+                    child: SingleChildScrollView(
+                      child: _buildFormContent(),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  _buildDividerWithText(),
+                  const SizedBox(height: 20),
+                  _buildSocialButtons(),
+                  const SizedBox(height: 20),
+                  _buildLoginText(),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -170,7 +165,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget _buildInputField(String label, TextEditingController controller, {bool isPassword = false}) {
     return Center(
       child: Container(
-        width: 350,
+        width: 250,
         margin: const EdgeInsets.only(bottom: 15),
         child: TextFormField(
           controller: controller,
@@ -224,7 +219,9 @@ class _SignupScreenState extends State<SignupScreen> {
         ],
       ),
       child: ElevatedButton(
-        onPressed: () {
+        onPressed: _isLoading
+            ? null
+            : () async {
           if (_formKey.currentState?.validate() ?? false) {
             if (_passwordController.text != _confirmPasswordController.text) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -232,7 +229,7 @@ class _SignupScreenState extends State<SignupScreen> {
               );
               return;
             }
-            signupUser();
+            await signupUser();
           }
         },
         style: ElevatedButton.styleFrom(
@@ -243,7 +240,16 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           padding: const EdgeInsets.symmetric(vertical: 12),
         ),
-        child: Text(
+        child: _isLoading
+            ? const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            strokeWidth: 2,
+          ),
+        )
+            : Text(
           'SIGN UP',
           style: GoogleFonts.montserrat(
             color: Colors.white,
@@ -312,13 +318,13 @@ class _SignupScreenState extends State<SignupScreen> {
         RichText(
           text: TextSpan(
             text: 'Already have an account ? ',
-            style: GoogleFonts.montserrat(color: Colors.black),
+            style: GoogleFonts.montserrat(color: Colors.white),
             children: [
               WidgetSpan(
                 child: GestureDetector(
                   onTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => LoginScreen()),
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
                     );
                   },
                   child: Text(
