@@ -37,7 +37,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-
   @override
   void dispose() {
     _usernameController.dispose();
@@ -46,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> loginUser() async {
-    setState(() => _isLoading = true); // Show spinner
+    setState(() => _isLoading = true);
 
     final url = Uri.parse('http://192.168.29.68:4000/login');
     final username = _usernameController.text.trim();
@@ -60,7 +59,6 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (response.statusCode == 200) {
-        // Success → go to map screen
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -72,13 +70,11 @@ class _LoginScreenState extends State<LoginScreen> {
         _showErrorDialog(error['error'] ?? 'Invalid credentials');
       }
     } catch (e) {
-      _showErrorDialog("Network error occurred.");
+      _showErrorDialog("Network error occurred: ${e.toString()}");
     } finally {
-      setState(() => _isLoading = false); // Hide spinner
+      setState(() => _isLoading = false);
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -87,41 +83,34 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Fullscreen background image
           Positioned.fill(
             child: Image.asset(
               'assets/images/background.jpg',
               fit: BoxFit.cover,
             ),
           ),
-          // Main content above background
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : Column(
-                  children: [
-                    const SizedBox(height: 40),
-                    LiquidGlassContainer(
-                      width: size.width * 0.9,
-                      height: size.width * 1.35,
-                      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-                      borderRadius: 25,
-                      backgroundKey: _backgroundKey,
-                      child: SingleChildScrollView(
-                        child: _buildFormContent(),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    _buildDividerWithText(),
-                    const SizedBox(height: 20),
-                    _buildSocialButtons(),
-                    const SizedBox(height: 20),
-                    _buildSignupText(),
-                  ],
-                )
-
+              child: Column(
+                children: [
+                  const SizedBox(height: 40),
+                  LiquidGlassContainer(
+                    width: size.width * 0.9,
+                    height: size.width * 1.35,
+                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                    borderRadius: 25,
+                    backgroundKey: _backgroundKey,
+                    child: SingleChildScrollView(child: _buildFormContent()),
+                  ),
+                  const SizedBox(height: 30),
+                  _buildDividerWithText(),
+                  const SizedBox(height: 20),
+                  _buildSocialButtons(),
+                  const SizedBox(height: 20),
+                  _buildSignupText(),
+                ],
+              ),
             ),
           ),
         ],
@@ -132,11 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildFormContent() {
     return Column(
       children: [
-        Image.asset(
-          'assets/images/logo.png',
-          width: 80,
-          height: 80,
-        ),
+        Image.asset('assets/images/logo.png', width: 80, height: 80),
         const SizedBox(height: 10),
         Text(
           'LOGIN',
@@ -167,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildInputField(String label, TextEditingController controller, {bool isPassword = false}) {
     return Center(
       child: Container(
-        width: 350,
+        width: 250,
         margin: const EdgeInsets.only(bottom: 15),
         child: TextFormField(
           controller: controller,
@@ -177,8 +162,8 @@ class _LoginScreenState extends State<LoginScreen> {
             fontWeight: FontWeight.w500,
           ),
           decoration: InputDecoration(
-            hintText : label,
-            hintStyle : GoogleFonts.montserrat(
+            hintText: label,
+            hintStyle: GoogleFonts.montserrat(
               color: Colors.black54,
               fontWeight: FontWeight.w500,
             ),
@@ -215,7 +200,9 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
       child: ElevatedButton(
-        onPressed: () {
+        onPressed: _isLoading
+            ? null
+            : () {
           if (_formKey.currentState?.validate() ?? false) {
             loginUser();
           }
@@ -226,9 +213,17 @@ class _LoginScreenState extends State<LoginScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(25),
           ),
-          padding: const EdgeInsets.symmetric(vertical: 12),
         ),
-        child: Text(
+        child: _isLoading
+            ? const SizedBox(
+          height: 22,
+          width: 22,
+          child: CircularProgressIndicator(
+            color: Colors.white,
+            strokeWidth: 2,
+          ),
+        )
+            : Text(
           'LOGIN',
           style: GoogleFonts.montserrat(
             color: Colors.white,
@@ -281,11 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
         borderRadius: BorderRadius.circular(25),
       ),
       child: Center(
-        child: Image.asset(
-          imagePath,
-          width: 24,
-          height: 24,
-        ),
+        child: Image.asset(imagePath, width: 24, height: 24),
       ),
     );
   }
@@ -302,9 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         GestureDetector(
-          onTap: () {
-            Navigator.of(context).pop();
-          },
+          onTap: () => Navigator.of(context).pop(),
           child: Text(
             'SIGN UP',
             style: GoogleFonts.montserrat(
