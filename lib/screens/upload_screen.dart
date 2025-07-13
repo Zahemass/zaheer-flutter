@@ -6,7 +6,7 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'package:http/http.dart' as http;
 import 'package:iconsax/iconsax.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
@@ -41,11 +41,14 @@ class _UploadScreenState extends State<UploadScreen> {
   int _selectedIndex = 1;
 
   final List<String> categories = [
-    "Food",
-    "Fun",
-    "History",
+    "Foodie Finds",
+    "Funny Tales",
+    "History Whishpers",
     "Hidden spots",
-    "Art & Culture"
+    "Art & Culture",
+    "Legends & Myths",
+    "Shopping Gems",
+    "Festive Movements"
   ];
 
   final Map<String, String> categoryEmojis = {
@@ -180,7 +183,7 @@ class _UploadScreenState extends State<UploadScreen> {
   Future<void> _generateTitleFromAudio(File audioFile) async {
     setState(() => _isGeneratingTitle = true);
 
-    final uri = Uri.parse('http://192.168.29.17:4000/audiotitle');
+    final uri = Uri.parse('http://192.168.29.68:4000/audiotitle');
     final request = http.MultipartRequest('POST', uri)
       ..files.add(await http.MultipartFile.fromPath('audio', audioFile.path));
 
@@ -278,7 +281,7 @@ class _UploadScreenState extends State<UploadScreen> {
     setState(() => _isUploadingSpot = true);
 
     try {
-      final uri = Uri.parse('http://192.168.29.17:4000/spots');
+      final uri = Uri.parse('http://172.20.10.2:4000/spots');
       final request = http.MultipartRequest('POST', uri);
 
       final selectedCategory = categories[selectedCategoryIndex];
