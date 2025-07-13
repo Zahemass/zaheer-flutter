@@ -9,7 +9,11 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:sample_proj/screens/upload_screen.dart';
+import 'package:sample_proj/screens/user_profile_screen.dart';
+import 'package:sample_proj/components/app_bar.dart';
 
+int _selectedIndex = 0;
 
 class PlayPostScreen extends StatefulWidget {
   final String username;
@@ -17,6 +21,7 @@ class PlayPostScreen extends StatefulWidget {
   final int views;
   final double latitude;
   final double longitude;
+
 
   const PlayPostScreen({
     super.key,
@@ -545,16 +550,7 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
               borderGradient: LinearGradient(
                 colors: [Colors.white24, Colors.white10],
               ),
-              child: Center(
-                child: Text(
-                  "LOCAL LENS",
-                  style: GoogleFonts.montserrat(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+              child: const GlassAppBar(),
             ),
           ),
 
@@ -805,12 +801,30 @@ class _PlayPostScreenState extends State<PlayPostScreen> {
       ),
 
       // Bottom Navigation
-      bottomNavigationBar: CustomBottomNav(
+      bottomNavigationBar: isExpanded
+          ? null // Hides the BottomNavBar when expanded
+          : CustomBottomNav(
         currentIndex: 0,
         onTap: (index) {
           // Navigation logic
+          if (index == 1){
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => UploadScreen(username: widget.username)),
+            );
+          }else if (index == 2){
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => UserProfileScreen(username: widget.username)),
+            );
+          } else {
+            setState(() {
+              _selectedIndex = index;
+            });
+          }
         },
       ),
+
     );
   }
 
