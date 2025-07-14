@@ -1,5 +1,5 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:glassmorphism/glassmorphism.dart';
 
 class CustomBottomNav extends StatelessWidget {
   final int currentIndex;
@@ -13,35 +13,47 @@ class CustomBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassmorphicContainer(
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      height: 100,
       width: double.infinity,
-      height: 75,
-      borderRadius: 50,
-      blur: 30, // more blur for liquid glass feel
-      alignment: Alignment.center,
-      border: 1.5,
-      linearGradient: LinearGradient(
-        colors: [
-          Colors.white.withOpacity(0.25),
-          Colors.white.withOpacity(0.05),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      borderGradient: LinearGradient(
-        colors: [
-          Colors.white.withOpacity(0.6),
-          Colors.white.withOpacity(0.05),
-        ],
-      ),
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildNavIcon(Icons.push_pin_rounded, 0),
-          _buildNavIcon(Icons.upload_rounded, 1),
-          _buildNavIcon(Icons.person, 2),
-        ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Stack(
+          children: [
+            // 🔵 Blur only inside this nav bar area
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+              child: Container(
+                color: Colors.transparent,
+              ),
+            ),
+
+            // 🧊 PNG Image on top of blur
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/bottomnav.png',
+                fit: BoxFit.cover,
+              ),
+            ),
+
+            // 🔘 Icons
+            Positioned(
+              bottom: 33, // 👈 Adjust this to move icons further down
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildNavIcon(Icons.push_pin_rounded, 0),
+                  _buildNavIcon(Icons.upload_rounded, 1),
+                  _buildNavIcon(Icons.person, 2),
+                ],
+              ),
+            ),
+
+          ],
+        ),
       ),
     );
   }
@@ -55,13 +67,13 @@ class CustomBottomNav extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isActive ? Colors.redAccent.withOpacity(0.1) : Colors.transparent,
+          color: isActive ? Colors.white.withOpacity(0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Icon(
           icon,
           size: 26,
-          color: isActive ? Colors.redAccent : Colors.black.withOpacity(0.6),
+          color: isActive ? Colors.redAccent : Colors.black.withOpacity(0.8),
         ),
       ),
     );
