@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:http/http.dart' as http;
+import 'dart:ui';
 import 'package:iconsax/iconsax.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -39,6 +40,7 @@ class _UploadScreenState extends State<UploadScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   int selectedCategoryIndex = 0;
   int _selectedIndex = 1;
+
 
   final List<String> categories = [
     "Foodie Finds",
@@ -100,11 +102,20 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Future<void> _uploadAudioFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.audio,
+      type: FileType.custom,
+      allowedExtensions: ['mp3'], // ✅ Only allow mp3
     );
 
     if (result != null && result.files.single.path != null) {
       final file = File(result.files.single.path!);
+
+      // ✅ Check extension again (just in case)
+      if (!file.path.toLowerCase().endsWith(".mp3")) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("❌ Please upload an MP3 file.")),
+        );
+        return;
+      }
 
       setState(() {
         _uploadedAudio = file;
@@ -114,6 +125,7 @@ class _UploadScreenState extends State<UploadScreen> {
       await _generateTitleFromAudio(file);
     }
   }
+
 
   Future<void> _toggleRecording() async {
     if (_isRecording) {
@@ -281,7 +293,7 @@ class _UploadScreenState extends State<UploadScreen> {
     setState(() => _isUploadingSpot = true);
 
     try {
-      final uri = Uri.parse('http://172.20.10.2:4000/spots');
+      final uri = Uri.parse('http://192.168.29.68:4000/spots');
       final request = http.MultipartRequest('POST', uri);
 
       final selectedCategory = categories[selectedCategoryIndex];
@@ -349,6 +361,21 @@ class _UploadScreenState extends State<UploadScreen> {
       backgroundColor: const Color(0xFFFFE4EC),
       body: Stack(
         children: [
+          // 🔽 Add this: Background image
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/upl.png',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), // adjust for strength
+              child: Container(
+                color: Colors.white.withOpacity(0.1), // frosted overlay
+              ),
+            ),
+          ),
           SingleChildScrollView(
             padding: const EdgeInsets.only(top: 120, bottom: 100),
             child: Padding(
@@ -364,7 +391,7 @@ class _UploadScreenState extends State<UploadScreen> {
                     selectedIndex: selectedCategoryIndex,
                     onSelected: (index) => setState(() => selectedCategoryIndex = index),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 15),
 
                   LocationSelector(
                     selectedLatLng: _selectedLatLng,
@@ -416,7 +443,7 @@ class _UploadScreenState extends State<UploadScreen> {
                     controller: _descriptionController,
                     maxLines: 4,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
 
                   if (_thumbnail != null)
                     ThumbnailSelector(
@@ -424,7 +451,7 @@ class _UploadScreenState extends State<UploadScreen> {
                       onTap: _showThumbnailOptions,
                     ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 2),
                   UploadSubmit(
                     onSubmit: _uploadSpot,
                     isUploading: _isUploadingSpot,
